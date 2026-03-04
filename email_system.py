@@ -14,7 +14,10 @@ def add_short_body(email: dict) -> dict:
 
 # Очистка текста письма
 def clean_body_text(body: str) -> str:
-    return body.replace('\t', ' ').replace('\n', ' ')
+    body = body.replace('\t', ' ').replace('\n', ' ')
+    body = ' '.join(body.split())
+    body = body.strip()
+    return body
 
 
 # Формирование итогового текста письма
@@ -35,6 +38,12 @@ def check_empty_fields(subject: str, body: str) -> tuple[bool, bool]:
 # Маска email отправителя
 def mask_sender_email(login: str, domain: str) -> str:
     return login[:2] + "***@" + domain
+
+
+# Получение логина и домена
+def extract_login_domain(address: str) -> tuple[str, str]:
+    login, domain = address.split('@')
+    return login, domain
 
 
 # Корректность email адресов
@@ -74,8 +83,20 @@ def get_correct_email(email_list: list[str]) -> list[str]:
         if not e.lower().endswith(allowed_domains):
             continue
 
-        correct.append(e)
+        login, domain = extract_login_domain(e)
+
+        if not login:
+            continue
+
+        if not domain or domain.startswith('.'):
+            continue
+
+        correct.append(normalize_addresses(e))
+
     return correct
+
+
+print(get_correct_email(test_emails))
 
 
 # Создание словаря письма
@@ -97,12 +118,6 @@ def add_send_date(email: dict) -> dict:
     return email
 
 
-# Получение логина и домена
-def extract_login_domain(address: str) -> tuple[str, str]:
-    login, domain = address.split('@')
-    return login, domain
-
-
 # Часть В. Отправка письма
 # Функция отправки письма с базовой валидацией адресов и логикой выбора отправителя recipient
 def sender_email(recipient_list: list[str], subject: str, message: str, *, sender="default@study.com") -> list[dict]:
@@ -117,6 +132,11 @@ def sender_email(recipient_list: list[str], subject: str, message: str, *, sende
         print('Ошибка: нет корректных адресов получателей.')
         return []
 
+    valid_sender = get_correct_email([sender])
+    if not valid_sender:
+        print('Ошибка: адрес отправителя некорректен.')
+        return []
+
     # Проверить заполненность темы и тела письма
     is_subject_empty, is_body_empty = check_empty_fields(subject, message)
 
@@ -129,20 +149,20 @@ def sender_email(recipient_list: list[str], subject: str, message: str, *, sende
         return []
 
     # Исключить отправку самому себе
-    for recipient in valid_recipients:
-        if recipient == sender:
-            valid_recipients.remove(recipient)
-        print('Отправитель совпадает с отправителем, этот адрес удалён.')
+    sender = normalize_addresses(sender)
+    valid_recipients = list(set(valid_recipients))
+    if sender in valid_recipients:
+        valid_recipients.remove(sender)
+        print('Получатель совпадает с отправителем, удалён.')
 
     # Нормализовать все текстовые данные
     clean_subject = clean_body_text(subject)
     clean_message = clean_body_text(message)
-    sender = normalize_addresses(sender)
     new_recipients = []
     for email in valid_recipients:
         clean_email_recipients = normalize_addresses(email)
         new_recipients.append(clean_email_recipients)
-        valid_recipients = new_recipients
+    valid_recipients = new_recipients
     # Создать письмо для каждого получателя
     sent_emails = []
     for recipient in valid_recipients:
@@ -167,4 +187,5 @@ def sender_email(recipient_list: list[str], subject: str, message: str, *, sende
         email["sent_text"] = build_sent_text(email)
 
         sent_emails.append(email)
+
     return sent_emails
