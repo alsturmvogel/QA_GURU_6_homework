@@ -187,4 +187,5 @@ def sender_email(recipient_list: list[str], subject: str, message: str, *, sende
         email["sent_text"] = build_sent_text(email)
 
         sent_emails.append(email)
+
     return sent_emails
